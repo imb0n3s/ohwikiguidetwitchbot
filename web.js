@@ -155,6 +155,27 @@ function createApp(pool) {
     }
   });
 
+  // Builder dictionary: the Community Builds page exports its slug -> name map here
+  // (see README "Builder data"). CORS is open because the page lives on the wiki domain.
+  const builds = require("./builds");
+  app.options("/admin/builder-dict", (req, res) => res.set({ "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST" }).sendStatus(204));
+  app.post("/admin/builder-dict", express.json({ limit: "5mb" }), (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    if (req.query.key !== cfg.ADMIN_KEY) return res.status(403).json({ error: "forbidden" });
+    const d = req.body;
+    if (!d || typeof d.names !== "object") return res.status(400).json({ error: "expected { names: {slug: label}, sets: {itemSlug: setName} }" });
+    builds.setDict({ names: d.names, sets: d.sets || {}, updated: Date.now() });
+    res.json({ ok: true, names: Object.keys(d.names).length, sets: Object.keys(d.sets || {}).length });
+  });
+  app.get("/admin/builds", async (req, res) => {
+    if (req.query.key !== cfg.ADMIN_KEY) return res.status(403).send("forbidden");
+    try {
+      const rows = await builds.getBuilds();
+      const q = req.query.q;
+      res.json({ dict: !!builds.getDict(), count: rows.length, answer: q ? await builds.answerBuild(String(q)) : undefined, sample: rows.slice(0, 3).map((r) => ({ id: r.id, user: r.user_id, summary: r.summary, decoded: r.decoded })) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   // Diagnostic: send a test message as the bot and show Twitch's raw reply
   app.get("/admin/say", async (req, res) => {
     if (req.query.key !== cfg.ADMIN_KEY) return res.status(403).send("forbidden");

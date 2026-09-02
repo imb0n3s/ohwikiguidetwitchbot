@@ -86,8 +86,9 @@ function makeHandler(pool) {
     inFlight++;
     console.log(`[#${ev.broadcaster_user_login}] ${ev.chatter_user_name}: ${arg}`);
     try {
-      const { text: answer, source, url } = await answerQuestion(arg);
-      await reply(`${answer}${url ? ` ${url}` : ""}`);
+      const { text: answer, messages, source, url } = await answerQuestion(arg);
+      if (messages) { for (const m of messages) { await reply(m); await new Promise((r) => setTimeout(r, 600)); } }
+      else await reply(`${answer}${url ? ` ${url}` : ""}`);
       db.bumpQuestions(bid);
       db.logQuestion(bid, ev.chatter_user_login, arg, source, true);
     } catch (e) {
