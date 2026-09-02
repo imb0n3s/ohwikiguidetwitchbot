@@ -77,7 +77,11 @@ function summarize(title, text, question) {
   if (!parts.length) {
     // no labelled fields (guide/build pages) — take the meaningful lines in order, skipping nav junk
     const lines = text.split("\n").map((l) => l.trim())
-      .filter((l) => l.length >= 12 && !/^(##|▸|quick links|join the discord|return to|back to|front page|select )/i.test(l));
+      .filter((l) => (l.length >= 12 || /^[•\-*]\s*\d/.test(l)) && !/^(##|▸|quick links|join the discord|return to|back to|front page|select )/i.test(l))
+      .map((l) => l.replace(/^[•\-*]\s*/, ""));
+    // recipe-style sections: "effect; 1 X; 2 Y" -> "effect | Ingredients: 1 X, 2 Y"
+    const ing = lines.filter((l) => /^\d+\s/.test(l));
+    if (ing.length && ing.length < lines.length) return `${lines.filter((l) => !/^\d+\s/.test(l)).join("; ")} | Ingredients: ${ing.join(", ")}`;
     return lines.join("; ").replace(/\s+/g, " ");
   }
   return parts.map((p) => p.s).join(" | ");

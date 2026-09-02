@@ -57,7 +57,8 @@ function scriptStringsToText(wikitext) {
     const re = /(?:title\s*:\s*)?(["'])((?:\\.|(?!\1)[^\\\n])*)\1/g;
     let m;
     while ((m = re.exec(block))) {
-      const isTitle = m[0].startsWith("title");
+      // a header is either `title: "X"` or an object key like `"Crumbly Bread": {`
+      const isTitle = m[0].startsWith("title") || /^\s*:\s*\{/.test(block.slice(m.index + m[0].length));
       let s = m[2].replace(/\\(["'\\/])/g, "$1");
       if (/^https?:\/\//.test(s) || /^[#.][\w-]+$/.test(s)) continue; // urls, css selectors
       s = htmlToText(s);
@@ -95,7 +96,7 @@ async function getSectionIndex() {
     const big = [];
     do {
       const data = await apiGet({ action: "query", generator: "allpages", gaplimit: "500", gapnamespace: "0", prop: "info", ...(gapcontinue ? { gapcontinue } : {}) });
-      for (const p of Object.values(data.query?.pages || {})) if (p.length > 40000 && !IGNORE_TITLES.has(p.title)) big.push(p.title);
+      for (const p of Object.values(data.query?.pages || {})) if (p.length > 15000 && !IGNORE_TITLES.has(p.title)) big.push(p.title);
       gapcontinue = data.continue?.gapcontinue;
     } while (gapcontinue);
     for (const title of big) {
