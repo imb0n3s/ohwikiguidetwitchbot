@@ -83,6 +83,34 @@ async function getAllTitles() {
   return titles;
 }
 
+// Big data pages (Deviation Main Page, builders) hold dozens of "## Section" entries that
+// the wiki's own search can't see. Index those section names so questions like
+// "where do I find the soul summoner" resolve to the right page + section.
+let sectionIndex = { entries: [], ts: 0 }; // [{ page, section }]
+async function getSectionIndex() {
+  if (Date.now() - sectionIndex.ts < TITLES_TTL_MS && sectionIndex.entries.length) return sectionIndex.entries;
+  const entries = [];
+  try {
+    let gapcontinue;
+    const big = [];
+    do {
+      const data = await apiGet({ action: "query", generator: "allpages", gaplimit: "500", gapnamespace: "0", prop: "info", ...(gapcontinue ? { gapcontinue } : {}) });
+      for (const p of Object.values(data.query?.pages || {})) if (p.length > 40000 && !IGNORE_TITLES.has(p.title)) big.push(p.title);
+      gapcontinue = data.continue?.gapcontinue;
+    } while (gapcontinue);
+    for (const title of big) {
+      const text = await getPageText(title);
+      for (const m of text.matchAll(/^## (.+)$/gm)) {
+        const section = m[1].trim();
+        if (section.length > 2) entries.push({ page: title, section });
+      }
+    }
+    sectionIndex = { entries, ts: Date.now() };
+    console.log(`[wiki] indexed ${entries.length} sections across ${big.length} large pages`);
+  } catch (e) { console.error("[wiki] section index failed:", e.message); }
+  return sectionIndex.entries;
+}
+
 async function searchTitles(query, limit = 5) {
   const data = await apiGet({ action: "query", list: "search", srsearch: query, srlimit: String(limit), srwhat: "text" });
   return data.query.search.map((r) => r.title).filter((t) => !IGNORE_TITLES.has(t));
@@ -148,6 +176,11 @@ async function findRelevantPages(question, max = 3) {
       if (words.length && words.every((w) => q.includes(w))) ranked.push({ t, score: 50 + words.length });
     }
   }
+  // sections inside big pages count like titles ("soul summoner" -> Deviation Main Page)
+  for (const { page, section } of await getSectionIndex()) {
+    const sl = section.toLowerCase();
+    if (q.includes(sl) && !ranked.some((r) => r.t === page)) ranked.push({ t: page, score: 90 + sl.length });
+  }
   ranked.sort((a, b) => b.score - a.score);
   const picks = ranked.map((r) => r.t);
 
@@ -158,4 +191,4 @@ async function findRelevantPages(question, max = 3) {
   return picks.slice(0, max);
 }
 
-module.exports = { findRelevantPages, getPageText, trimForQuestion, pageUrl, getAllTitles, searchTitles, WIKI_BASE };
+module.exports = { findRelevantPages, getPageText, trimForQuestion, getSectionIndex, pageUrl, getAllTitles, searchTitles, WIKI_BASE };

@@ -30,7 +30,7 @@ function getDict() {
   try { dictCache = JSON.parse(db.getSetting("builder_dict") || "null"); } catch { dictCache = null; }
   return dictCache;
 }
-function setDict(d) { dictCache = d; db.setSetting("builder_dict", JSON.stringify(d)); }
+function setDict(d) { dictCache = d; db.setSetting("builder_dict", JSON.stringify(d)); buildsCache = { rows: [], ts: 0 }; }
 
 const pretty = (slug) => String(slug || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 function name(slug) {

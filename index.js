@@ -12,6 +12,7 @@ async function main() {
   const app = createApp(pool);
   app.listen(cfg.PORT, () => console.log(`[web] ${cfg.BOT_NAME} site on ${cfg.BASE_URL} (port ${cfg.PORT})`));
 
+  require("./wiki").getSectionIndex().catch(() => {});
   if (db.getBotAccount()) {
     await pool.joinAllFromDb().catch((e) => console.error("[eventsub] startup failed:", e.message));
   } else {
