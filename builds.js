@@ -119,7 +119,6 @@ function format(b, others) {
   const m2 = [
     d.armor.length ? `Armor: ${d.armor.map((a) => `${a.slot} ${a.item}${a.hide ? ` [${a.hide}]` : ""}${a.mod ? ` ${a.mod}` : ""}`).join("; ")}` : "",
     d.sets.length ? `Sets: ${d.sets.join(", ")}` : "",
-    d.food.length ? `Food: ${d.food.join(", ")}` : "",
   ].filter(Boolean).join(" | ");
   const m3 = `Full card: ${link}${others.length ? ` · ${others.length} more ${d.primary?.type || ""} build${others.length > 1 ? "s" : ""}: ${others.slice(0, 3).map((o) => `${o.name} (#${o.id})`).join(", ")} at ${cfg.WIKI_BASE}/Community_Builds`.replace("  ", " ") : ""}`;
   const clip = (s) => (s.length > 490 ? s.slice(0, 489).replace(/\s+\S*$/, "") + "…" : s);

@@ -8,7 +8,7 @@ const MAX_ANSWER_CHARS = Number(process.env.MAX_ANSWER_CHARS || 380);
 
 // question words -> page fields, in priority order
 const INTENTS = [
-  { re: /\b(drop|drops|farm|where|get|obtain|find|silo|securement unit|location|spawn)\b/i, fields: ["Drops From", "Location", "Notes", "Crafting Needs", "Securement Environment"] },
+  { re: /\b(drop|drops|farm|where|get|obtain|find|silo|securement unit|location|spawn)\b/i, fields: ["Drops From", "Location", "Obtained From", "Source", "How To Get"], only: true },
   { re: /\b(skill|attack|attacks|ability|abilities|ultimate|dps|damage)\b/i, fields: ["Attacks", "Deviation Battle Skill", "Deviation Ultimate", "Function"] },
   { re: /\b(mood|power|dormancy|environment|happy|happiness|environ)\b/i, fields: ["Securement Environment", "Notes"] },
   { re: /\b(variation|variations|trait|traits|glistening|starry|scroll)\b/i, fields: ["Variations", "Notes"] },
@@ -56,7 +56,8 @@ function summarize(title, text, question) {
   const byName = (n) => fields.find((f) => f.name.toLowerCase() === n.toLowerCase() && fieldText(f).length > 2);
 
   const intent = INTENTS.find((i) => i.re.test(question));
-  const wanted = intent ? [...intent.fields, ...DEFAULT_FIELDS] : DEFAULT_FIELDS;
+  // `only` intents answer with just that field (e.g. "where do I find X" -> Drops From, nothing else)
+  const wanted = intent ? (intent.only ? intent.fields : [...intent.fields, ...DEFAULT_FIELDS]) : DEFAULT_FIELDS;
 
   const parts = [];
   let len = title.length + 2;
@@ -67,7 +68,11 @@ function summarize(title, text, question) {
     if (!t) continue;
     parts.push({ f, s: `${f.name}: ${t}` });
     len += t.length + name.length + 4;
-    if (len >= MAX_ANSWER_CHARS) break;
+    if (len >= MAX_ANSWER_CHARS || intent?.only) break;
+  }
+  if (!parts.length && intent?.only) {
+    // the page has no drop info: fall back to the usual summary rather than nothing
+    return summarize(title, text, "");
   }
   if (!parts.length) {
     // no labelled fields (guide/build pages) — take the meaningful lines in order, skipping nav junk
