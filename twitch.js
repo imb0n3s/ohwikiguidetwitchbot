@@ -123,7 +123,8 @@ async function sendChat(broadcasterId, message, replyToMessageId) {
     },
   });
   const d = r?.data?.[0];
-  if (d && !d.is_sent) console.warn(`[twitch] message dropped in ${broadcasterId}: ${d.drop_reason?.message}`);
+  if (!d || !d.is_sent) console.warn(`[twitch] message NOT sent in ${broadcasterId}: ${JSON.stringify(r)}`);
+  else console.log(`[twitch] sent to ${broadcasterId}: ${message.slice(0, 80)}`);
   return d;
 }
 

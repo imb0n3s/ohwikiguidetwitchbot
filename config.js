@@ -18,7 +18,7 @@ const cfg = {
   DATA_DIR: process.env.DATA_DIR || "./data",
   BOT_NAME: process.env.BOT_NAME || "OH Wiki Bot",
   WIKI_BASE: process.env.WIKI_BASE || "https://ohwikiguide.com",
-  COMMANDS: (process.env.COMMANDS || "!ask,!wiki").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
+  COMMANDS: (process.env.COMMANDS || "!ohwikiguide,!ask").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
   USER_COOLDOWN_SECONDS: Number(process.env.USER_COOLDOWN_SECONDS || 20),
   CHANNEL_COOLDOWN_SECONDS: Number(process.env.CHANNEL_COOLDOWN_SECONDS || 3),
   MAX_CONCURRENT_ANSWERS: Number(process.env.MAX_CONCURRENT_ANSWERS || 8),

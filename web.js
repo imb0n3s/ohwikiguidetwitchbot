@@ -151,6 +151,17 @@ function createApp(pool) {
     }
   });
 
+  // Diagnostic: send a test message as the bot and show Twitch's raw reply
+  app.get("/admin/say", async (req, res) => {
+    if (req.query.key !== cfg.ADMIN_KEY) return res.status(403).send("forbidden");
+    try {
+      const ch = db.getChannelByLogin(String(req.query.channel || db.getBotAccount().login));
+      if (!ch) return res.status(404).json({ error: "channel not joined" });
+      const r = await twitch.sendChat(ch.broadcaster_id, String(req.query.text || "test message from OH Wiki Guide Bot"));
+      res.json({ channel: ch.login, result: r });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   app.get("/admin", (req, res) => {
     if (req.query.key !== cfg.ADMIN_KEY) return res.status(403).send("forbidden");
     const rows = db.listEnabledChannels().map((c) => `<tr><td><a href="https://twitch.tv/${esc(c.login)}">${esc(c.display_name)}</a></td><td>${new Date(c.joined_at).toISOString().slice(0, 10)}</td><td>${esc(c.joined_via)}</td><td>${c.questions}</td><td>${pool.socketFor(c.broadcaster_id) ? "live" : "<b>not subscribed</b>"}</td></tr>`).join("");

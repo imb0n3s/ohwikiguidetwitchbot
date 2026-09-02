@@ -6,7 +6,7 @@ their viewers can ask Once Human questions that get answered from
 [ohwikiguide.com](https://ohwikiguide.com).
 
 ```
-viewer42:   !ask where does Butterfly's Emissary drop?
+viewer42:   !ohwikiguide where does Butterfly's Emissary drop?
 ohwikibot:  @viewer42 Butterfly's Emissary — Drops From: Manibus: Securement Units;
             Way of Winter: Securement Units; Monolith: N/A | Notes: No specific Silo
             but can drop from anyone  https://ohwikiguide.com/Butterfly's_Emissary
@@ -95,7 +95,7 @@ Suggest they `/mod ohwikibot` in their channel: Twitch rate-limits normal users 
 
 | Command | Who | What |
 |---|---|---|
-| `!ask <question>` / `!wiki <question>` | anyone | Answer from the wiki + link |
+| `!ohwikiguide <question>` / `!ask <question>` | anyone | Answer from the wiki + link |
 | `!ohwiki` | anyone | Short help |
 | `!ohwiki cooldown <seconds>` | mods / broadcaster | Per-viewer cooldown for that channel (default 20s) |
 | `!ohwiki leave` | mods / broadcaster | Remove the bot from the channel |
