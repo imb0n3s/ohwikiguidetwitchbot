@@ -5,6 +5,5 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY *.js ./
 ENV NODE_ENV=production DATA_DIR=/data
-VOLUME ["/data"]
 EXPOSE 3000
 CMD ["node", "index.js"]
