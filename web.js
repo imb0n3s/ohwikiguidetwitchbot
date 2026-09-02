@@ -142,7 +142,11 @@ function createApp(pool) {
         return res.send(simple("Removed", `Removed from ${user.display_name}'s channel`, "The bot has left your chat. You can add it back any time."));
       }
       db.addChannel({ broadcaster_id: user.id, login: user.login, display_name: user.display_name, joined_via: "web" });
-      await pool.join(user.id);
+      try { await pool.join(user.id); }
+      catch (e) {
+        if (e.message !== "NEEDS_PERMISSION") throw e;
+        return res.status(500).send(simple("Almost", "Twitch didn't grant the bot permission", `Please try <a href="/auth/twitch?action=add">Add</a> again and make sure to click <b>Authorize</b> on Twitch's page, or type <code>/mod ${esc(db.getBotAccount().login)}</code> in your chat and then add again.`));
+      }
       return res.send(simple("Added", `Added to ${user.display_name}'s channel!`,
         `Try it: type <code>${esc(cfg.COMMANDS[0])} what does Atomic Snail do</code> in your chat. Consider <code>/mod ${esc(db.getBotAccount().login)}</code> so the bot isn't rate-limited.`));
     } catch (e) {
@@ -164,8 +168,8 @@ function createApp(pool) {
 
   app.get("/admin", (req, res) => {
     if (req.query.key !== cfg.ADMIN_KEY) return res.status(403).send("forbidden");
-    const rows = db.listEnabledChannels().map((c) => `<tr><td><a href="https://twitch.tv/${esc(c.login)}">${esc(c.display_name)}</a></td><td>${new Date(c.joined_at).toISOString().slice(0, 10)}</td><td>${esc(c.joined_via)}</td><td>${c.questions}</td><td>${pool.socketFor(c.broadcaster_id) ? "live" : "<b>not subscribed</b>"}</td></tr>`).join("");
-    res.send(page("Admin", `<h1>Channels (${rows ? db.countChannels() : 0})</h1><div class="card"><table style="width:100%;border-collapse:collapse"><tr><th align=left>Channel</th><th align=left>Joined</th><th align=left>Via</th><th align=left>Q's</th><th align=left>Status</th></tr>${rows}</table></div><p>Sockets: ${pool.sockets.length}, subscriptions: ${pool.channelCount}, questions total: ${db.totalQuestions()}</p>`));
+    const rows = db.listEnabledChannels().map((c) => `<tr><td><a href="https://twitch.tv/${esc(c.login)}">${esc(c.display_name)}</a></td><td>${new Date(c.joined_at).toISOString().slice(0, 10)}</td><td>${esc(c.joined_via)}</td><td>${c.questions}</td><td>${pool.isJoined(c.broadcaster_id) ? "live" : "<b>not subscribed</b>"}</td></tr>`).join("");
+    res.send(page("Admin", `<h1>Channels (${rows ? db.countChannels() : 0})</h1><div class="card"><table style="width:100%;border-collapse:collapse"><tr><th align=left>Channel</th><th align=left>Joined</th><th align=left>Via</th><th align=left>Q's</th><th align=left>Status</th></tr>${rows}</table></div><p>Conduit: ${esc(pool.conduitId || "none")}, subscriptions: ${pool.channelCount}, questions total: ${db.totalQuestions()}</p>`));
   });
 
   return app;

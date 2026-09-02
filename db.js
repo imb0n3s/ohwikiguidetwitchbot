@@ -27,6 +27,10 @@ CREATE TABLE IF NOT EXISTS bot_account (
   refresh_token TEXT NOT NULL,
   expires_at    INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT
+);
 CREATE TABLE IF NOT EXISTS questions (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   ts             INTEGER NOT NULL,
@@ -56,6 +60,8 @@ const q = {
       refresh_token=excluded.refresh_token, expires_at=excluded.expires_at`),
   logQuestion: db.prepare(`INSERT INTO questions (ts, broadcaster_id, chatter, question, source_page, ok) VALUES (?, ?, ?, ?, ?, ?)`),
   totalQuestions: db.prepare(`SELECT COUNT(*) AS n FROM questions`),
+  getSetting: db.prepare(`SELECT value FROM settings WHERE key=?`),
+  setSetting: db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`),
 };
 
 module.exports = {
@@ -71,4 +77,6 @@ module.exports = {
   saveBotAccount: (b) => q.saveBot.run(b),
   logQuestion: (bid, chatter, question, source, ok) => q.logQuestion.run(Date.now(), bid, chatter, question, source, ok ? 1 : 0),
   totalQuestions: () => q.totalQuestions.get().n,
+  getSetting: (k) => q.getSetting.get(k)?.value ?? null,
+  setSetting: (k, v) => q.setSetting.run(k, v),
 };

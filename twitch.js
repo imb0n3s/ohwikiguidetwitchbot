@@ -66,6 +66,24 @@ async function getUsersByLogin(accessToken, logins) {
   return (await res.json()).data;
 }
 
+// ---------- app access token (client credentials) ----------
+// Used for EventSub conduits and for sending chat. This is what makes Twitch
+// list the account under "Chat Bots" instead of as a regular user.
+let appToken = null; // { token, expires_at }
+
+async function getAppToken(force = false) {
+  if (!force && appToken && Date.now() < appToken.expires_at - 5 * 60 * 1000) return appToken.token;
+  const res = await fetch(`${OAUTH}/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: cfg.TWITCH_CLIENT_ID, client_secret: cfg.TWITCH_CLIENT_SECRET, grant_type: "client_credentials" }),
+  });
+  if (!res.ok) throw new Error(`app token failed: ${res.status} ${await res.text()}`);
+  const t = await res.json();
+  appToken = { token: t.access_token, expires_at: Date.now() + t.expires_in * 1000 };
+  return appToken.token;
+}
+
 // ---------- bot account token management ----------
 
 let refreshing = null;
@@ -86,9 +104,9 @@ async function doRefresh(bot) {
   return updated;
 }
 
-// Helix call as the bot account, retrying once on 401 after a refresh
-async function helix(method, path, { body, query } = {}) {
-  let bot = await getBotToken();
+// Helix call, retrying once on 401 after a refresh. `as: "app"` uses the app token
+// (EventSub conduits, sending chat); `as: "bot"` (default) uses the bot account's token.
+async function helix(method, path, { body, query, as = "bot" } = {}) {
   const call = async (token) => {
     const u = new URL(`${HELIX}${path}`);
     if (query) for (const [k, v] of Object.entries(query)) u.searchParams.set(k, v);
@@ -98,10 +116,14 @@ async function helix(method, path, { body, query } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     });
   };
-  let res = await call(bot.access_token);
-  if (res.status === 401) {
-    bot = await doRefresh(bot);
+  let res;
+  if (as === "app") {
+    res = await call(await getAppToken());
+    if (res.status === 401) res = await call(await getAppToken(true));
+  } else {
+    let bot = await getBotToken();
     res = await call(bot.access_token);
+    if (res.status === 401) { bot = await doRefresh(bot); res = await call(bot.access_token); }
   }
   if (!res.ok) {
     const text = await res.text();
@@ -113,8 +135,9 @@ async function helix(method, path, { body, query } = {}) {
 }
 
 async function sendChat(broadcasterId, message, replyToMessageId) {
-  const bot = await getBotToken();
+  const bot = db.getBotAccount();
   const r = await helix("POST", "/chat/messages", {
+    as: "app",
     body: {
       broadcaster_id: broadcasterId,
       sender_id: bot.user_id,
@@ -128,4 +151,4 @@ async function sendChat(broadcasterId, message, replyToMessageId) {
   return d;
 }
 
-module.exports = { BOT_SCOPES, STREAMER_SCOPES, authorizeUrl, exchangeCode, refreshToken, getUser, getUsersByLogin, getBotToken, helix, sendChat };
+module.exports = { BOT_SCOPES, STREAMER_SCOPES, authorizeUrl, getAppToken, exchangeCode, refreshToken, getUser, getUsersByLogin, getBotToken, helix, sendChat };

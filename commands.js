@@ -35,6 +35,10 @@ function makeHandler(pool) {
           await pool.join(ev.chatter_user_id);
           return reply(`@${ev.chatter_user_name} joined your channel! Viewers can now type ${cfg.COMMANDS[0]} <question>. Type !leave here to remove me.`);
         } catch (e) {
+          if (e.message === "NEEDS_PERMISSION") {
+            db.removeChannel(ev.chatter_user_id);
+            return reply(`@${ev.chatter_user_name} I need permission for your channel first: either type /mod ${botLogin()} in your chat and !join again, or add me in one click at ${cfg.BASE_URL}`);
+          }
           console.error("[join] failed:", e.message);
           return reply(`@${ev.chatter_user_name} couldn't join right now, try again in a minute.`);
         }

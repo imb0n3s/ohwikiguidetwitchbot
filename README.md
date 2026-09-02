@@ -12,9 +12,10 @@ ohwikibot:  @viewer42 Butterfly's Emissary — Drops From: Manibus: Securement U
             but can drop from anyone  https://ohwikiguide.com/Butterfly's_Emissary
 ```
 
-One server runs for everyone. It listens to every joined channel over Twitch EventSub
-(the modern replacement for IRC), looks the answer up on the wiki, and replies via the
-Twitch chat API.
+One server runs for everyone. It listens to every joined channel through an EventSub
+**Conduit** (Twitch's official bot transport — this is what makes the account show up
+under "Chat Bots" in viewer lists), looks the answer up on the wiki, and replies via the
+Twitch chat API using the app token.
 
 **Two answer modes** (`ANSWER_MODE` in the env vars):
 
@@ -148,7 +149,7 @@ lifts the send rate limits. Until then, nothing to do.
 ```
 index.js     start web + chat listener
 web.js       landing page, Twitch OAuth (streamer add/remove, bot setup), /admin
-eventsub.js  EventSub WebSocket pool (reconnects, resubscribes, 3×300 channels)
+eventsub.js  EventSub Conduit + WebSocket shard (reconnects; subscriptions persist server-side)
 commands.js  !ask / !join / !leave / !ohwiki handling, cooldowns
 twitch.js    OAuth, token refresh, Helix calls, send chat message
 wiki.js      MediaWiki API client, text extraction, page ranking
