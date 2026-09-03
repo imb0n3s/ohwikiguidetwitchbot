@@ -87,24 +87,54 @@ function summarize(title, text, question) {
   return parts.map((p) => p.s).join(" | ");
 }
 
+// "Variations:" lines look like "Lunar Oracle: Weapon DMG +5%. x1.5 when Sanity is below 30%"
+function findVariation(text, qWords) {
+  const f = parseFields(text).find((x) => x.name.toLowerCase() === "variations");
+  if (!f) return null;
+  for (const line of f.lines) {
+    const m = line.match(/^([^:]{3,60}?)\s*:\s*(.+)$/);
+    if (!m) continue;
+    const words = m[1].toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+    if (words.some((w) => qWords.has(w))) return { name: m[1].trim(), desc: m[2].trim() };
+  }
+  return null;
+}
+
 async function answerQuestion(question) {
   const candidates = await wiki.findRelevantPages(question, 3);
   if (!candidates.length) return { text: `I couldn't find that on the wiki. Try browsing ${wiki.WIKI_BASE}`, source: null, url: null };
 
   const q = question.toLowerCase();
-  // Prefer a page whose title is in the question, or a big page with a matching "## Section",
-  // over a page that merely mentions the words somewhere in its text.
-  let title = candidates[0], section = null;
+  const qWords = new Set(q.replace(/'s\b/g, "").split(/[^a-z0-9]+/).filter(Boolean));
+  // Prefer a page whose title is in the question, or a big page with a matching "## Section"
+  // (exact, or sharing a distinctive word like "lonewolf"), over a page that merely mentions the words.
+  const sectionScore = (header) => {
+    const h = header.toLowerCase();
+    if (h.length > 2 && wiki.includesName(q, h)) return 3;
+    const words = wiki.nameWords(h);
+    const hit = words.filter((w) => qWords.has(w));
+    if (words.length && hit.length === words.length) return 2;
+    if (hit.some((w) => w.length >= 6)) return 1 + hit.length / words.length;
+    return 0;
+  };
+  let title = candidates[0], section = null, best = 0;
   for (const t of candidates) {
-    if (q.includes(t.toLowerCase())) { title = t; break; }
+    if (wiki.includesName(q, t.toLowerCase())) { title = t; section = null; best = 4; break; }
     const text = await wiki.getPageText(t);
-    const sec = text.split(/\n(?=## )/).slice(1).find((s) => { const h = s.split("\n")[0].replace(/^## /, "").toLowerCase(); return h.length > 2 && q.includes(h); });
-    if (sec) { title = t; section = sec; break; }
+    for (const sec of text.split(/\n(?=## )/).slice(1)) {
+      const sc = sectionScore(sec.split("\n")[0].replace(/^## /, ""));
+      if (sc > best) { best = sc; title = t; section = sec; }
+    }
+    if (best >= 3) break;
   }
 
   const full = await wiki.getPageText(title);
   const body = section || wiki.trimForQuestion(full, question);
   const label = section ? section.split("\n")[0].replace(/^## /, "") : title;
+
+  // Variation asked by name ("lunar lonewolf", "glistening blue butterfly") -> answer with just that variation
+  const variation = findVariation(body, qWords);
+  if (variation) return { text: `${label} — ${variation.name} variation: ${variation.desc}`, source: title, url: wiki.pageUrl(title) };
 
   let out = `${label} — ${summarize(label, body, question)}`.replace(/\s+/g, " ").trim();
   if (out.length > MAX_ANSWER_CHARS) out = out.slice(0, MAX_ANSWER_CHARS - 1).replace(/\s+\S*$/, "") + "…";

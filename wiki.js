@@ -159,6 +159,17 @@ function pageUrl(title) {
   return `${WIKI_BASE}/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 }
 
+// words in a title/section name that are worth matching on (drops generic ones)
+const GENERIC = new Set(["deviation", "deviations", "page", "main", "guide", "build", "builds", "loadout", "loadouts", "the", "and", "of", "list", "all", "trait", "traits", "combat", "crafting", "territory", "recipe", "recipes", "food", "drinks", "gear", "weapon", "armor", "mods", "mod", "specific", "community", "creator", "creators", "content", "test", "hides", "hide"]);
+// whole-word containment: "butter" must not match inside "butterfly"
+function includesName(q, nameLower) {
+  const esc = nameLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`).test(q);
+}
+function nameWords(nameLower) {
+  return nameLower.replace(/'s\b/g, "").split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !GENERIC.has(w));
+}
+
 // Pick the best pages for a question: exact/partial title matches first,
 // then full-text search results.
 async function findRelevantPages(question, max = 3) {
@@ -167,20 +178,26 @@ async function findRelevantPages(question, max = 3) {
   const ranked = [];
 
   const looksLikeDate = (t) => /^\d{1,2} \w+ \d{4}$|^\w+ \d{1,2} \d{4}$/.test(t);
+  const qWords = new Set(q.replace(/'s\b/g, "").split(/[^a-z0-9]+/).filter(Boolean));
+  const add = (t, score) => { const r = ranked.find((x) => x.t === t); if (r) r.score = Math.max(r.score, score); else ranked.push({ t, score }); };
   for (const t of titles) {
     const tl = t.toLowerCase();
     if (tl.length < 3 || looksLikeDate(t)) continue;
-    if (q.includes(tl)) ranked.push({ t, score: 100 + tl.length });
-    else {
-      // every significant word of the title present in the question
-      const words = tl.split(/[^a-z0-9']+/).filter((w) => w.length > 2);
-      if (words.length && words.every((w) => q.includes(w))) ranked.push({ t, score: 50 + words.length });
-    }
+    if (includesName(q, tl)) { add(t, 100 + tl.length); continue; }
+    const words = nameWords(tl);
+    if (!words.length) continue;
+    const hit = words.filter((w) => qWords.has(w));
+    if (hit.length === words.length) add(t, 50 + words.length);
+    else if (hit.some((w) => w.length >= 6)) add(t, 30 + (10 * hit.length) / words.length); // "lonewolf" -> Lonewolf's Whisper
   }
   // sections inside big pages count like titles ("soul summoner" -> Deviation Main Page)
   for (const { page, section } of await getSectionIndex()) {
     const sl = section.toLowerCase();
-    if (q.includes(sl) && !ranked.some((r) => r.t === page)) ranked.push({ t: page, score: 90 + sl.length });
+    if (includesName(q, sl)) { add(page, 90 + sl.length); continue; }
+    const words = nameWords(sl);
+    const hit = words.filter((w) => qWords.has(w));
+    if (words.length && hit.length === words.length) add(page, 45 + words.length);
+    else if (hit.some((w) => w.length >= 6)) add(page, 28 + (10 * hit.length) / words.length);
   }
   ranked.sort((a, b) => b.score - a.score);
   const picks = ranked.map((r) => r.t);
@@ -192,4 +209,4 @@ async function findRelevantPages(question, max = 3) {
   return picks.slice(0, max);
 }
 
-module.exports = { findRelevantPages, getPageText, trimForQuestion, getSectionIndex, pageUrl, getAllTitles, searchTitles, WIKI_BASE };
+module.exports = { findRelevantPages, getPageText, trimForQuestion, getSectionIndex, nameWords, includesName, pageUrl, getAllTitles, searchTitles, WIKI_BASE };
