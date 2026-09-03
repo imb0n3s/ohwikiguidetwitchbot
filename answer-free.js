@@ -104,7 +104,7 @@ async function answerQuestion(question) {
   const candidates = await wiki.findRelevantPages(question, 3);
   if (!candidates.length) return { text: `I couldn't find that on the wiki. Try browsing ${wiki.WIKI_BASE}`, source: null, url: null };
 
-  const q = question.toLowerCase();
+  const q = wiki.expandNicknames(question);
   const qWords = new Set(q.replace(/'s\b/g, "").split(/[^a-z0-9]+/).filter(Boolean));
   // Prefer a page whose title is in the question, or a big page with a matching "## Section"
   // (exact, or sharing a distinctive word like "lonewolf"), over a page that merely mentions the words.

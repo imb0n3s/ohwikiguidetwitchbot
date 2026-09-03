@@ -159,6 +159,28 @@ function pageUrl(title) {
   return `${WIKI_BASE}/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 }
 
+// Chat nicknames -> what the wiki calls it. Matched as whole phrases, longest first.
+// Add to this list whenever viewers use a name the wiki doesn't.
+const NICKNAMES = {
+  "lunar wolf": "lonewolf whisper lunar oracle",
+  "lunar lonewolf": "lonewolf whisper lunar oracle",
+  "lone wolf": "lonewolf whisper",
+  "lonewolf": "lonewolf whisper",
+  "wolf": "lonewolf whisper",
+  "butterfly": "butterfly emissary",
+  "snail": "atomic snail",
+  "turbow": "compound bow",
+  "bow": "compound bow",
+};
+function expandNicknames(question) {
+  let q = ` ${question.toLowerCase()} `;
+  for (const [nick, real] of Object.entries(NICKNAMES).sort((a, b) => b[0].length - a[0].length)) {
+    const re = new RegExp(`(^|[^a-z0-9])${nick.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`);
+    if (re.test(q) && !q.includes(` ${real} `)) q = q.replace(re, `$1${real}$2`);
+  }
+  return q.trim();
+}
+
 // words in a title/section name that are worth matching on (drops generic ones)
 const GENERIC = new Set(["deviation", "deviations", "page", "main", "guide", "build", "builds", "loadout", "loadouts", "the", "and", "of", "list", "all", "trait", "traits", "combat", "crafting", "territory", "recipe", "recipes", "food", "drinks", "gear", "weapon", "armor", "mods", "mod", "specific", "community", "creator", "creators", "content", "test", "hides", "hide"]);
 // whole-word containment: "butter" must not match inside "butterfly"
@@ -173,7 +195,7 @@ function nameWords(nameLower) {
 // Pick the best pages for a question: exact/partial title matches first,
 // then full-text search results.
 async function findRelevantPages(question, max = 3) {
-  const q = question.toLowerCase();
+  const q = expandNicknames(question);
   const titles = await getAllTitles();
   const ranked = [];
 
@@ -209,4 +231,4 @@ async function findRelevantPages(question, max = 3) {
   return picks.slice(0, max);
 }
 
-module.exports = { findRelevantPages, getPageText, trimForQuestion, getSectionIndex, nameWords, includesName, pageUrl, getAllTitles, searchTitles, WIKI_BASE };
+module.exports = { findRelevantPages, getPageText, trimForQuestion, getSectionIndex, nameWords, includesName, expandNicknames, pageUrl, getAllTitles, searchTitles, WIKI_BASE };
