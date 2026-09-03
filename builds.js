@@ -126,7 +126,10 @@ function format(b, others) {
 }
 
 function isBuildQuestion(question) {
-  return /\b(build|builds|loadout|load ?out|setup|set ?up|gear)\b/i.test(question);
+  // "gear bench", "where do I find gear" etc. are item/facility questions, not loadout requests
+  if (/\b(bench|workbench|facility|station|crate)\b/i.test(question)) return false;
+  if (/\b(build|builds|loadout|load ?out)\b/i.test(question)) return true;
+  return /\b(setup|set ?up|gear)\b/i.test(question) && !/\b(where|find|get|drop|drops|location|obtain)\b/i.test(question);
 }
 
 async function answerBuild(question) {
