@@ -3,9 +3,17 @@
 const cfg = require("./config");
 const builds = require("./builds");
 const facilities = require("./facilities");
+const silos = require("./silos");
 const base = cfg.ANSWER_MODE === "claude" ? require("./answer") : require("./answer-free");
 
 async function answerQuestion(question) {
+  // "what's the boss in EX1" -> Securement Silo cards (per scenario)
+  try {
+    if (await silos.isSiloQuestion(question)) {
+      const r = await silos.answerSilo(question);
+      if (r) return r;
+    }
+  } catch (e) { console.error("[silos] failed, falling back:", e.message); }
   // "where can I find a gear bench" -> settlements that drop that facility (checked before builds: "gear" is a build word)
   if (facilities.isFacilityQuestion(question)) {
     try {
