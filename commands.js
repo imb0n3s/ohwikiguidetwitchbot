@@ -64,11 +64,12 @@ function makeHandler(pool) {
         db.setCooldown(bid, n);
         return reply(`Per-viewer cooldown set to ${n}s.`);
       }
-      return reply(`${cfg.BOT_NAME}: ask anything about Once Human with ${cfg.COMMANDS[0]} <question> — answers come from ${cfg.WIKI_BASE}. Mods: !ohwiki cooldown <s>, !ohwiki leave.`);
+      if (!sub || sub === "help") return reply(`${cfg.BOT_NAME}: ask anything about Once Human with ${cfg.COMMANDS[0]} <question> — answers come from ${cfg.WIKI_BASE}. Mods: !ohwiki cooldown <s>, !ohwiki leave.`);
+      // anything else after !ohwiki is a question — same as !ohwikiguide
     }
 
     // ---- the main event: !ask <question> ----
-    if (!cfg.COMMANDS.includes(cmd)) return;
+    if (!cfg.COMMANDS.includes(cmd) && cmd !== "!ohwiki") return;
     const channel = db.getChannel(bid);
     if (!channel?.enabled && bid !== botId()) return;
 
