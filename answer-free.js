@@ -140,10 +140,24 @@ async function answerQuestion(question) {
   if (variation) return { text: `${label} — ${variation.name} variation: ${variation.desc}`, source: title, url: wiki.pageUrl(title) };
 
   let out = `${label} — ${summarize(label, body, question)}`.replace(/\s+/g, " ").trim();
+  // Scenario filter: "in Manibus" -> only the Manibus line of scenario-split fields (Drops From etc.)
   // Endless Dream = Manibus map + Way of Winter map combined, so both scenarios' lines apply
-  if (/\bendless\s*dreams?\b/i.test(question) && /manibus|way of winter/i.test(out)) {
-    out = out.replace(/;\s*Monolith:\s*N\/A/i, "");
-    out = `${out} (Endless Dream combines the Manibus and Way of Winter maps, so both apply)`;
+  const SCEN = [
+    { re: /\bendless\s*dreams?\b/i, keep: ["manibus", "way of winter"], label: "Endless Dream" },
+    { re: /\b(manibus|mani)\b/i, keep: ["manibus"], label: "Manibus" },
+    { re: /\b(way of winter|wow|winter)\b/i, keep: ["way of winter"], label: "Way of Winter" },
+    { re: /\b(isles? of abyss|isles|abyss|ioa)\b/i, keep: ["isles of abyss"], label: "Isles of Abyss" },
+  ];
+  const scen = SCEN.find((x) => x.re.test(question));
+  if (scen && /\b(manibus|way of winter|isles of abyss)\s*:/i.test(out)) {
+    out = out.replace(/([A-Za-z' ]+): ((?:[A-Za-z' ]+:\s*[^;|]+(?:;\s*)?)+)/g, (m, field, vals) => {
+      const segs = vals.split(/;\s*/).filter(Boolean).map((v) => v.trim());
+      if (!segs.some((v) => /^(manibus|way of winter|isles of abyss|monolith)\s*:/i.test(v))) return m;
+      const kept = segs.filter((v) => scen.keep.some((k) => v.toLowerCase().startsWith(k + ":")))
+        .map((v) => scen.keep.length > 1 ? v : v.replace(/^[^:]+:\s*/, ""));
+      return kept.length ? `${field} (${scen.label}): ${kept.join("; ")}` : `${field} (${scen.label}): not listed`;
+    });
+    if (scen.label === "Endless Dream") out += " (Endless Dream combines the Manibus and Way of Winter maps, so both apply)";
   }
   if (out.length > MAX_ANSWER_CHARS) out = out.slice(0, MAX_ANSWER_CHARS - 1).replace(/\s+\S*$/, "") + "…";
   return { text: out, source: title, url: wiki.pageUrl(title) };
