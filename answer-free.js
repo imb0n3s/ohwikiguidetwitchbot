@@ -88,19 +88,22 @@ function summarize(title, text, question) {
 }
 
 // "Variations:" lines look like "Lunar Oracle: Weapon DMG +5%. x1.5 when Sanity is below 30%"
-function findVariation(text, qWords) {
+function findVariation(text, qWords, baseName = "") {
   const f = parseFields(text).find((x) => x.name.toLowerCase() === "variations");
   if (!f) return null;
+  const base = new Set(baseName.toLowerCase().replace(/'s\b/g, "").split(/[^a-z0-9]+/));
   for (const line of f.lines) {
     const m = line.match(/^([^:]{3,60}?)\s*:\s*(.+)$/);
     if (!m) continue;
-    const words = m[1].toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+    // only the words unique to the variation count ("Carp"/"Evergreen", not "Hydronaut"/"Fish")
+    const words = m[1].toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !base.has(w));
     if (words.some((w) => qWords.has(w))) return { name: m[1].trim(), desc: m[2].trim() };
   }
   return null;
 }
 
 async function answerQuestion(question) {
+  question = await wiki.correctSpelling(question); // "hyrdonaught" -> "hydronaut"
   const candidates = await wiki.findRelevantPages(question, 3);
   if (!candidates.length) return { text: `I couldn't find that on the wiki. Try browsing ${wiki.WIKI_BASE}`, source: null, url: null };
 
@@ -133,7 +136,7 @@ async function answerQuestion(question) {
   const label = section ? section.split("\n")[0].replace(/^## /, "") : title;
 
   // Variation asked by name ("lunar lonewolf", "glistening blue butterfly") -> answer with just that variation
-  const variation = findVariation(body, qWords);
+  const variation = findVariation(body, qWords, label);
   if (variation) return { text: `${label} — ${variation.name} variation: ${variation.desc}`, source: title, url: wiki.pageUrl(title) };
 
   let out = `${label} — ${summarize(label, body, question)}`.replace(/\s+/g, " ").trim();

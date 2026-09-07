@@ -182,6 +182,46 @@ function expandNicknames(question) {
 }
 
 // words in a title/section name that are worth matching on (drops generic ones)
+// ---- spelling correction: "hyrdonaught" -> "hydronaut" using every word in page titles + section headers ----
+function editDistance(a, b) {
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) dp[i][j] = Math.min(dp[i][j], dp[i - 2][j - 2] + 1); // transposition
+  }
+  return dp[a.length][b.length];
+}
+let vocabCache = { ts: 0, words: new Set() };
+async function getVocab() {
+  if (Date.now() - vocabCache.ts < TITLES_TTL_MS && vocabCache.words.size) return vocabCache.words;
+  const words = new Set();
+  const add = (s) => s.toLowerCase().replace(/'s\b/g, "").split(/[^a-z0-9]+/).forEach((w) => w.length > 3 && words.add(w));
+  for (const t of await getAllTitles()) add(t);
+  for (const e of await getSectionIndex()) add(e.section);
+  for (const k of Object.keys(NICKNAMES)) add(k);
+  vocabCache = { ts: Date.now(), words };
+  return words;
+}
+const COMMON = new Set("what where when which does drop drops from find get can you have there their about with this that these those they them then than into your yours more most some like just also only good best build builds need needs want wants make makes give gives tell tells show shows will would could should might much many very really please thanks thank should still again every each other another after before over under between through during without within because while until since being been have having take takes took come comes came know knows think thinks mean means meaning kind type sort thing things stuff item items scenario scenarios game".split(" "));
+async function correctSpelling(question) {
+  let vocab;
+  try { vocab = await getVocab(); } catch { return question; }
+  return question.replace(/[A-Za-z]{5,}/g, (word) => {
+    const w = word.toLowerCase();
+    if (vocab.has(w) || COMMON.has(w)) return word;
+    const maxDist = w.length >= 8 ? 3 : w.length >= 6 ? 2 : 1;
+    let best = null, bestD = maxDist + 1;
+    for (const v of vocab) {
+      if (Math.abs(v.length - w.length) > maxDist || v[0] !== w[0]) continue; // same first letter keeps it sane
+      const d = editDistance(w, v);
+      if (d < bestD || (d === bestD && best && v.length > best.length)) { bestD = d; best = v; }
+    }
+    if (best && bestD <= maxDist) { console.log(`[wiki] spelling: ${word} -> ${best}`); return best; }
+    return word;
+  });
+}
+
 const GENERIC = new Set(["deviation", "deviations", "page", "main", "guide", "build", "builds", "loadout", "loadouts", "the", "and", "of", "list", "all", "trait", "traits", "combat", "crafting", "territory", "recipe", "recipes", "food", "drinks", "gear", "weapon", "armor", "mods", "mod", "specific", "community", "creator", "creators", "content", "test", "hides", "hide"]);
 // whole-word containment: "butter" must not match inside "butterfly"
 function includesName(q, nameLower) {
@@ -231,4 +271,4 @@ async function findRelevantPages(question, max = 3) {
   return picks.slice(0, max);
 }
 
-module.exports = { htmlToText, findRelevantPages, getPageText, trimForQuestion, getSectionIndex, nameWords, includesName, expandNicknames, pageUrl, getAllTitles, searchTitles, WIKI_BASE };
+module.exports = { correctSpelling, htmlToText, findRelevantPages, getPageText, trimForQuestion, getSectionIndex, nameWords, includesName, expandNicknames, pageUrl, getAllTitles, searchTitles, WIKI_BASE };
