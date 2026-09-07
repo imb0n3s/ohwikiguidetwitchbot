@@ -55,13 +55,18 @@ async function getBuilds() {
   const { url, key } = await getSupa();
   const r = await fetch(`${url}/rest/v1/builds?select=id,user_id,name,summary,code,created_at&approved=eq.true&order=created_at.desc&limit=200`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
   if (!r.ok) throw new Error(`builds fetch ${r.status}`);
-  const rows = (await r.json()).map((b) => ({ ...b, decoded: decode(b.code) }));
+  const rows = (await r.json()).map((b) => ({ ...b, author: b.name, title: titleOf(b.code), decoded: decode(b.code) }));
   buildsCache = { rows, ts: Date.now() };
   return rows;
 }
 
+// share codes look like "c=~slug.slug.slug&cr=5tws&n=TurBow%201%25%20Health%20Build&yt=..."
+function titleOf(code) {
+  const m = String(code || "").match(/[#&]n=([^&]+)/);
+  try { return m ? decodeURIComponent(m[1]).trim() : ""; } catch { return ""; }
+}
 function decode(code) {
-  const vals = String(code || "").replace(/^c=/, "").replace(/^~/, "").split(".");
+  const vals = String(code || "").replace(/^c=/, "").replace(/^~/, "").split("&")[0].split(".");
   const f = {};
   FIELDS.forEach((k, i) => (f[k] = vals[i] || ""));
   const weapon = (p) => f[`${p}_item`] ? {
@@ -87,20 +92,32 @@ function decode(code) {
 const STOP = new Set("i need a an the build builds loadout load out setup gear for best good with what is are any some give me show your my please pls can you have got".split(" "));
 const ALIASES = { bow: "compound bow", turbow: "compound bow", crossbow: "crossbow", p90: "pdw90", pdw: "pdw90", kvd: "kvd", aws: "aws.338", sniper: "sniper", smg: "smg", tec9: "tec9", tec: "tec9", sks: "sks", kam: "kam", abyss: "abyss glance", de50: "de.50", deagle: "de.50", ebr: "ebr-14", sn700: "sn700", mps7: "mps7", mps5: "mps5", aug: "aug", "1%": "1%", hp: "1%" };
 
+// chat names for build authors (Twitch name -> name used on the wiki builder)
+const AUTHORS = { bones: "imbon3z", bone: "imbon3z", imbon3s: "imbon3z", imbones: "imbon3z" };
+
 function buildText(b) {
   const d = b.decoded;
-  return [b.name, b.summary, d.deviation, d.primary?.name, d.primary?.type, d.secondary?.name, d.secondary?.type, ...d.sets, ...d.traits].filter(Boolean).join(" ").toLowerCase();
+  return [b.title, b.author, b.summary, d.deviation, d.primary?.name, d.primary?.type, d.secondary?.name, d.secondary?.type, ...d.sets, ...d.traits].filter(Boolean).join(" ").toLowerCase();
 }
 
 function findBuilds(question, rows) {
   const q = question.toLowerCase().replace(/[^\w.%' -]+/g, " ");
   const words = q.split(/\s+/).filter((w) => w && !STOP.has(w));
-  const terms = new Set(words.map((w) => ALIASES[w] || w));
+  // keep both the word as typed ("turbow") and its alias ("compound bow") so a build literally
+  // named "TurBow ..." outranks every other bow build
+  const terms = new Set(words.flatMap((w) => (ALIASES[w] && ALIASES[w] !== w ? [w, ALIASES[w]] : [w])));
+  const authors = new Set(words.map((w) => AUTHORS[w] || w));
   if (!terms.size) return [];
   return rows.map((b) => {
     const text = buildText(b);
+    const title = (b.title || "").toLowerCase();
+    const author = (b.author || "").toLowerCase();
     let score = 0;
-    for (const t of terms) if (text.includes(t)) score += t.length > 3 ? 2 : 1;
+    for (const t of terms) {
+      if (title.includes(t)) score += 10;       // the build is literally named after it ("TurBow ...")
+      else if (text.includes(t)) score += t.length > 3 ? 2 : 1;
+    }
+    for (const a of authors) if (author && (author === a || author.includes(a) && a.length > 3)) score += 8; // "bones build"
     return { b, score };
   }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || b.b.id - a.b.id).map((x) => x.b);
 }
@@ -111,7 +128,7 @@ function format(b, others) {
   const link = `${cfg.WIKI_BASE}/Community_Builds#id=${b.id}`;
   const w = (x, label) => x ? `${label}: ${x.name}${x.calibration ? ` · ${x.calibration}` : ""}${x.substat ? ` (${x.substat})` : ""}${x.mod ? ` · Mod: ${x.mod}` : ""}${x.attachments.length ? ` · ${x.attachments.join(", ")}` : ""}` : "";
   const m1 = [
-    `${b.name || "Community"}'s ${d.primary?.name || "build"} build`,
+    b.title ? `${b.title} by ${b.author}` : `${b.author || "Community"}'s ${d.primary?.name || "build"} build`,
     d.deviation ? `Deviation: ${d.deviation}${d.traits.length ? ` (${d.traits.join(" / ")})` : ""}` : "",
     w(d.primary, "Primary"),
     w(d.secondary, "Secondary"),
@@ -120,7 +137,7 @@ function format(b, others) {
     d.armor.length ? `Armor: ${d.armor.map((a) => `${a.slot} ${a.item}${a.hide ? ` [${a.hide}]` : ""}${a.mod ? ` ${a.mod}` : ""}`).join("; ")}` : "",
     d.sets.length ? `Sets: ${d.sets.join(", ")}` : "",
   ].filter(Boolean).join(" | ");
-  const m3 = `Full card: ${link}${others.length ? ` · ${others.length} more ${d.primary?.type || ""} build${others.length > 1 ? "s" : ""}: ${others.slice(0, 3).map((o) => `${o.name} (#${o.id})`).join(", ")} at ${cfg.WIKI_BASE}/Community_Builds`.replace("  ", " ") : ""}`;
+  const m3 = `Full card: ${link}${others.length ? ` · ${others.length} more ${d.primary?.type || ""} build${others.length > 1 ? "s" : ""}: ${others.slice(0, 3).map((o) => `${o.title || o.author} (#${o.id})`).join(", ")} at ${cfg.WIKI_BASE}/Community_Builds`.replace("  ", " ") : ""}`;
   const clip = (s) => (s.length > 490 ? s.slice(0, 489).replace(/\s+\S*$/, "") + "…" : s);
   return [clip(m1), clip(m2), clip(m3)].filter((s) => s.trim());
 }
