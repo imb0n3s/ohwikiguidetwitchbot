@@ -104,7 +104,12 @@ async function answerSilo(question) {
   if (!matches.length) return null;
   const scen = SCENARIOS.find((x) => x.re.test(question));
   let note = "";
-  if (scen) {
+  if (/\bendless\s*dreams?\b/i.test(question)) {
+    // Endless Dream = Manibus + Way of Winter maps combined -> answer both, no filtering
+    matches = matches.filter((s) => /Manibus|Way of Winter/.test(s.scenario));
+    if (!matches.length) return null;
+    note = "(Endless Dream = Manibus + Way of Winter) ";
+  } else if (scen) {
     if (matches.some((s) => s.scenario.includes(scen.name))) matches = matches.filter((s) => s.scenario.includes(scen.name));
     else note = `(No ${scen.name} card for ${matches[0].name} on the wiki yet — showing ${matches.map((s) => s.scenario).join("/")}) `;
   }

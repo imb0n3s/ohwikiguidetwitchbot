@@ -140,6 +140,11 @@ async function answerQuestion(question) {
   if (variation) return { text: `${label} — ${variation.name} variation: ${variation.desc}`, source: title, url: wiki.pageUrl(title) };
 
   let out = `${label} — ${summarize(label, body, question)}`.replace(/\s+/g, " ").trim();
+  // Endless Dream = Manibus map + Way of Winter map combined, so both scenarios' lines apply
+  if (/\bendless\s*dreams?\b/i.test(question) && /manibus|way of winter/i.test(out)) {
+    out = out.replace(/;\s*Monolith:\s*N\/A/i, "");
+    out = `${out} (Endless Dream combines the Manibus and Way of Winter maps, so both apply)`;
+  }
   if (out.length > MAX_ANSWER_CHARS) out = out.slice(0, MAX_ANSWER_CHARS - 1).replace(/\s+\S*$/, "") + "…";
   return { text: out, source: title, url: wiki.pageUrl(title) };
 }

@@ -203,7 +203,7 @@ async function getVocab() {
   vocabCache = { ts: Date.now(), words };
   return words;
 }
-const COMMON = new Set("what where when which does drop drops from find get can you have there their about with this that these those they them then than into your yours more most some like just also only good best build builds need needs want wants make makes give gives tell tells show shows will would could should might much many very really please thanks thank should still again every each other another after before over under between through during without within because while until since being been have having take takes took come comes came know knows think thinks mean means meaning kind type sort thing things stuff item items scenario scenarios game".split(" "));
+const COMMON = new Set("endless dream dreams what where when which does drop drops from find get can you have there their about with this that these those they them then than into your yours more most some like just also only good best build builds need needs want wants make makes give gives tell tells show shows will would could should might much many very really please thanks thank should still again every each other another after before over under between through during without within because while until since being been have having take takes took come comes came know knows think thinks mean means meaning kind type sort thing things stuff item items scenario scenarios game".split(" "));
 async function correctSpelling(question) {
   let vocab;
   try { vocab = await getVocab(); } catch { return question; }
