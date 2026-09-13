@@ -7,10 +7,20 @@ const CACHE_MS = 10 * 60 * 1000;
 let cache = { ts: 0, settlements: [] };
 
 // words that carry no meaning when matching facility names
-const STOP = new Set("where can i do you get find found a an the is are my in at from how to for what does drop drops dropped location locate obtain pick up spawn which settlement settlements facility facilities".split(" "));
+const STOP = new Set("where can i do you get find found a an the is are my in at from how to for what does drop drops dropped location locate obtain pick up spawn which settlement settlements facility facilities map maps scenario scenarios on".split(" "));
+// scenario words are a filter, not part of the facility name
+const SCEN = [
+  { re: /\bendless\s*dreams?\b/i, keep: ["Manibus", "Way of Winter"], label: "Endless Dream" },
+  { re: /\b(manibus|mani)\b/i, keep: ["Manibus"], label: "Manibus" },
+  { re: /\b(way of winter|wow|winter)\b/i, keep: ["Way of Winter"], label: "Way of Winter" },
+  { re: /\b(isles? of abyss|isles|abyss|ioa)\b/i, keep: ["Isles of Abyss"], label: "Isles of Abyss" },
+];
 // spelling variants seen on the wiki / in chat
 const norm = (w) => w.toLowerCase().replace(/[^a-z0-9]/g, "")
-  .replace(/^workbench$|^bench$|^table$/, "workbench").replace(/^supply$|^supplies$/, "supply").replace(/^gears$/, "gear").replace(/^crates$/, "crate");
+  .replace(/^workbench$|^bench$|^table$/, "workbench").replace(/^supply$|^supplies$/, "supply")
+  .replace(/(?<=[a-z]{3})s$/, ""); // generators -> generator, crates -> crate, gears -> gear
+// "hydro" matches "hydropower", "gen" does not match "generator" (too short)
+const wordHit = (q, words) => words.includes(q) || (q.length >= 4 && words.some((w) => w.startsWith(q)));
 
 async function load() {
   if (Date.now() - cache.ts < CACHE_MS && cache.settlements.length) return cache.settlements;
@@ -51,13 +61,15 @@ async function load() {
 }
 
 function contentWords(question) {
-  return question.toLowerCase().replace(/'s\b/g, "").split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w)).map(norm);
+  let q = question.toLowerCase().replace(/'s\b/g, "");
+  for (const s of SCEN) q = q.replace(s.re, " ");
+  return q.split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w)).map(norm);
 }
 
 // is the question about a facility or a settlement at all?
 function isFacilityQuestion(question) {
   if (/\b(drops?|found|find|get|loot)\s+(in|at)\b/i.test(question)) return true; // "what drops in Evergreen"
-  return /\b(bench|workbench|facility|facilities|settlement|settlements|crate|stove|fridge|furnace|generator|drill|filter|tank|rack|pod|platform|refinery|table)\b/i.test(question)
+  return /\b(bench|workbench|facility|facilities|settlement|settlements|crate|stove|fridge|furnace|generator|drill|filter|tank|rack|pod|platform|refinery|table|drier|barrel|trough|hut|storage|chainsaw|pickaxe|sickle|pump)s?\b/i.test(question)
     && /\b(where|find|get|drop|drops|location|obtain|spawn|settlement|which|what)\b/i.test(question);
 }
 
@@ -67,6 +79,7 @@ async function answerFacility(question) {
   const q = contentWords(question);
   if (!q.length) return null;
   const url = wiki.pageUrl("Settlements");
+  const scen = SCEN.find((x) => x.re.test(question));
 
   // 1) question names a settlement -> list its drops
   const bySettlement = settlements.find((s) => { const n = s.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(norm); return n.length && n.every((w) => q.includes(w)); });
@@ -84,7 +97,7 @@ async function answerFacility(question) {
     const meaningful = q.filter((w) => w !== "advanced" && w !== "primary" && w !== "large" && w !== "small");
     if (!meaningful.length) continue;
     // every meaningful question word must be in the facility name; a qualifier in the question ("advanced") must be too
-    if (!meaningful.every((w) => words.includes(w))) continue;
+    if (!meaningful.every((w) => wordHit(w, words))) continue;
     if (q.some((w) => ["advanced", "primary", "large", "small"].includes(w) && !words.includes(w))) continue;
     const key = words.join(" "); // merges "Supply/Supplies", "Bench/Workbench" spellings
     if (!hits.has(key)) hits.set(key, { name: d.name, list: [] });
@@ -93,9 +106,15 @@ async function answerFacility(question) {
   if (!hits.size) return null;
 
   // prefer the facility whose name has the fewest extra words (closest match), list up to 3 name variants
-  const ranked = [...hits.values()].sort((a, b) => a.name.length - b.name.length).slice(0, 3);
+  let ranked = [...hits.values()].sort((a, b) => a.name.length - b.name.length).slice(0, 3);
+  let prefix = "Found at settlements — ";
+  if (scen) {
+    const inScen = ranked.map(({ name, list }) => ({ name, list: list.filter(({ s }) => scen.keep.includes(s.scenario)) })).filter((x) => x.list.length);
+    if (inScen.length) { ranked = inScen; prefix = `${scen.label} settlements — `; }
+    else prefix = `No ${scen.label} settlement lists that yet. Other scenarios — `;
+  }
   const parts = ranked.map(({ name, list }) => `${name}: ${list.map(({ s, coords }) => `${s.name} (${s.zone || s.scenario}, ${coords || s.location})`).join("; ")}`);
-  let text = `Found at settlements — ${parts.join(" | ")}`;
+  let text = prefix + parts.join(" | ");
   if (text.length > 440) text = text.slice(0, 439).replace(/\s+\S*$/, "") + "…";
   return { text, source: "Settlements", url };
 }
