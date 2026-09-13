@@ -4,9 +4,17 @@ const cfg = require("./config");
 const builds = require("./builds");
 const facilities = require("./facilities");
 const silos = require("./silos");
+const outposts = require("./outposts");
 const base = cfg.ANSWER_MODE === "claude" ? require("./answer") : require("./answer-free");
 
 async function answerQuestion(question) {
+  // "which outpost sells X" / "what does Camp Igloo sell" -> Outpost merchant cards
+  try {
+    if (await outposts.isOutpostQuestion(question)) {
+      const r = await outposts.answerOutpost(question);
+      if (r) return r;
+    }
+  } catch (e) { console.error("[outposts] failed, falling back:", e.message); }
   // "what's the boss in EX1" -> Securement Silo cards (per scenario)
   try {
     if (await silos.isSiloQuestion(question)) {
