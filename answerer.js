@@ -5,9 +5,17 @@ const builds = require("./builds");
 const facilities = require("./facilities");
 const silos = require("./silos");
 const outposts = require("./outposts");
+const gardener = require("./gardener");
 const base = cfg.ANSWER_MODE === "claude" ? require("./answer") : require("./answer-free");
 
 async function answerQuestion(question) {
+  // "how long does rubber take to farm" -> Gardener Glass grow times
+  try {
+    if (gardener.isGardenerQuestion(question)) {
+      const r = await gardener.answerGardener(question);
+      if (r) return r;
+    }
+  } catch (e) { console.error("[gardener] failed, falling back:", e.message); }
   // "which outpost sells X" / "what does Camp Igloo sell" -> Outpost merchant cards
   try {
     if (await outposts.isOutpostQuestion(question)) {

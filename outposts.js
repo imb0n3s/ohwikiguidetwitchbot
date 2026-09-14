@@ -59,7 +59,7 @@ async function isOutpostQuestion(question) {
 }
 
 // "Bear's Den" / "bears den" / "bear den" all compare equal
-const words = (s) => s.toLowerCase().replace(/'s\b/g, "").split(/[^a-z0-9&]+/).filter(Boolean).map((w) => (w.length > 3 ? w.replace(/s$/, "") : w));
+const words = (s) => s.toLowerCase().replace(/'s\b/g, "").split(/[^a-z0-9&]+/).filter(Boolean).map((w) => (w.length > 3 ? w.replace(/(?<!s)s$/, "") : w));
 
 async function answerOutpost(question) {
   const outposts = await load();
