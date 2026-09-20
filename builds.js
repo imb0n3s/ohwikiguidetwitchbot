@@ -119,15 +119,20 @@ function findBuilds(question, rows) {
     }
     for (const a of authors) if (author && (author === a || author.includes(a) && a.length > 3)) score += 8; // "bones build"
     return { b, score };
-  }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || b.b.id - a.b.id).map((x) => x.b);
+  }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || b.b.id - a.b.id);
 }
 
 // ---------- formatting (Twitch: 500 chars per message) ----------
+// Same shape as the wiki's own share link (cbShareSlug on the page): /id/Author/Weapon-Name.
+// ?id= rather than #id= because Twitch chat drops the #fragment when it linkifies a URL.
+const slug = (s) => String(s || "").trim().replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+function buildUrl(b) {
+  const parts = [slug(b.author), slug(b.decoded?.primary?.name)].filter(Boolean);
+  return `${cfg.WIKI_BASE}/Community_Builds?id=${b.id}${parts.map((p) => `/${p}`).join("")}`;
+}
 function format(b, others) {
   const d = b.decoded;
-  // ?id= (not #id=) — Twitch chat drops the #fragment when it linkifies a URL, so a #id link
-  // just opened the Community Builds page instead of this build
-  const link = `${cfg.WIKI_BASE}/Community_Builds?id=${b.id}`;
+  const link = buildUrl(b);
   const w = (x, label) => x ? `${label}: ${x.name}${x.calibration ? ` · ${x.calibration}` : ""}${x.substat ? ` (${x.substat})` : ""}${x.mod ? ` · Mod: ${x.mod}` : ""}${x.attachments.length ? ` · ${x.attachments.join(", ")}` : ""}` : "";
   const m1 = [
     b.title ? `${b.title} by ${b.author}` : `${b.author || "Community"}'s ${d.primary?.name || "build"} build`,
@@ -139,7 +144,7 @@ function format(b, others) {
     d.armor.length ? `Armor: ${d.armor.map((a) => `${a.slot} ${a.item}${a.hide ? ` [${a.hide}]` : ""}${a.mod ? ` ${a.mod}` : ""}`).join("; ")}` : "",
     d.sets.length ? `Sets: ${d.sets.join(", ")}` : "",
   ].filter(Boolean).join(" | ");
-  const m3 = `Full card: ${link}${others.length ? ` · ${others.length} more ${d.primary?.type || ""} build${others.length > 1 ? "s" : ""}: ${others.slice(0, 3).map((o) => `${o.title || o.author} ${cfg.WIKI_BASE}/Community_Builds?id=${o.id}`).join(", ")}`.replace("  ", " ") : ""}`;
+  const m3 = `Full card: ${link}${others.length ? ` · ${others.length} more ${d.primary?.type || ""} build${others.length > 1 ? "s" : ""}: ${others.slice(0, 3).map((o) => `${o.title || o.author} ${buildUrl(o)}`).join(", ")}`.replace("  ", " ") : ""}`;
   const clip = (s) => (s.length > 490 ? s.slice(0, 489).replace(/\s+\S*$/, "") + "…" : s);
   return [clip(m1), clip(m2), clip(m3)].filter((s) => s.trim());
 }
@@ -153,10 +158,14 @@ function isBuildQuestion(question) {
 
 async function answerBuild(question) {
   const rows = await getBuilds();
-  const matches = findBuilds(question, rows);
-  if (!matches.length) return null;
-  const best = matches[0];
-  const others = matches.slice(1).filter((m) => m.decoded.primary?.type === best.decoded.primary?.type);
+  const scored = findBuilds(question, rows);
+  if (!scored.length) return null;
+  const best = scored[0].b;
+  // Only suggest other builds when the question was generic ("bow build" — several builds tie).
+  // An author or build name ("bones bow build", "turbow build") adds 8-10 to one build's score,
+  // so a clear winner means the person asked for something specific — answer just that.
+  const specific = scored.length === 1 || scored[0].score - scored[1].score >= 8;
+  const others = specific ? [] : scored.slice(1).map((x) => x.b).filter((m) => m.decoded.primary?.type === best.decoded.primary?.type);
   return { messages: format(best, others), source: `Community Builds #${best.id}`, url: null };
 }
 
