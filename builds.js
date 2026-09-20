@@ -125,7 +125,9 @@ function findBuilds(question, rows) {
 // ---------- formatting (Twitch: 500 chars per message) ----------
 function format(b, others) {
   const d = b.decoded;
-  const link = `${cfg.WIKI_BASE}/Community_Builds#id=${b.id}`;
+  // ?id= (not #id=) — Twitch chat drops the #fragment when it linkifies a URL, so a #id link
+  // just opened the Community Builds page instead of this build
+  const link = `${cfg.WIKI_BASE}/Community_Builds?id=${b.id}`;
   const w = (x, label) => x ? `${label}: ${x.name}${x.calibration ? ` · ${x.calibration}` : ""}${x.substat ? ` (${x.substat})` : ""}${x.mod ? ` · Mod: ${x.mod}` : ""}${x.attachments.length ? ` · ${x.attachments.join(", ")}` : ""}` : "";
   const m1 = [
     b.title ? `${b.title} by ${b.author}` : `${b.author || "Community"}'s ${d.primary?.name || "build"} build`,
@@ -137,7 +139,7 @@ function format(b, others) {
     d.armor.length ? `Armor: ${d.armor.map((a) => `${a.slot} ${a.item}${a.hide ? ` [${a.hide}]` : ""}${a.mod ? ` ${a.mod}` : ""}`).join("; ")}` : "",
     d.sets.length ? `Sets: ${d.sets.join(", ")}` : "",
   ].filter(Boolean).join(" | ");
-  const m3 = `Full card: ${link}${others.length ? ` · ${others.length} more ${d.primary?.type || ""} build${others.length > 1 ? "s" : ""}: ${others.slice(0, 3).map((o) => `${o.title || o.author} (#${o.id})`).join(", ")} at ${cfg.WIKI_BASE}/Community_Builds`.replace("  ", " ") : ""}`;
+  const m3 = `Full card: ${link}${others.length ? ` · ${others.length} more ${d.primary?.type || ""} build${others.length > 1 ? "s" : ""}: ${others.slice(0, 3).map((o) => `${o.title || o.author} ${cfg.WIKI_BASE}/Community_Builds?id=${o.id}`).join(", ")}`.replace("  ", " ") : ""}`;
   const clip = (s) => (s.length > 490 ? s.slice(0, 489).replace(/\s+\S*$/, "") + "…" : s);
   return [clip(m1), clip(m2), clip(m3)].filter((s) => s.trim());
 }
