@@ -6,9 +6,13 @@ const facilities = require("./facilities");
 const silos = require("./silos");
 const outposts = require("./outposts");
 const gardener = require("./gardener");
+const fixed = require("./fixed");
 const base = cfg.ANSWER_MODE === "claude" ? require("./answer") : require("./answer-free");
 
 async function answerQuestion(question) {
+  // hand-written answers ("where are the vending machines") — see fixed.js
+  const f = fixed.answerFixed(question);
+  if (f) return f;
   // "how long does rubber take to farm" -> Gardener Glass grow times
   try {
     if (gardener.isGardenerQuestion(question)) {
