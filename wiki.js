@@ -171,6 +171,15 @@ const NICKNAMES = {
   "snail": "atomic snail",
   "turbow": "compound bow",
   "bow": "compound bow",
+  // viewers say "xenomorph"; the wiki page is Zeno-Purifier
+  "xeno-morph": "zeno-purifier",
+  "xeno morph": "zeno-purifier",
+  "xenomorph": "zeno-purifier",
+  "xenomorphs": "zeno-purifier",
+  "xeno": "zeno-purifier",
+  "zenomorph": "zeno-purifier",
+  "zeno morph": "zeno-purifier",
+  "zeno purifier": "zeno-purifier",
 };
 function expandNicknames(question) {
   let q = ` ${question.toLowerCase()} `;
