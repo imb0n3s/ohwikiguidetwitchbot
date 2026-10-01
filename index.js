@@ -6,8 +6,7 @@ const { makeHandler } = require("./commands");
 const { createApp } = require("./web");
 
 async function main() {
-  const lights = require("./lights");
-  const pool = new Conduit(null, lights.onEvent);
+  const pool = new Conduit(null);
   pool.onChat = makeHandler(pool);
 
   const app = createApp(pool);
@@ -16,7 +15,6 @@ async function main() {
   require("./wiki").getSectionIndex().catch(() => {});
   if (db.getBotAccount()) {
     await pool.joinAllFromDb().catch((e) => console.error("[eventsub] startup failed:", e.message));
-    await lights.init(pool).catch((e) => console.error("[lights] startup failed:", e.message));
   } else {
     console.log(`[setup] No bot account yet. Open ${cfg.BASE_URL}/setup?key=${cfg.ADMIN_KEY} and log in as the bot's Twitch account.`);
   }

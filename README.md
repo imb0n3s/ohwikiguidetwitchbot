@@ -159,14 +159,3 @@ answer.js    Claude prompt + answer formatting
 db.js        SQLite (channels, bot tokens, question log)
 ask.js       terminal tester
 ```
-
-## Stream lights (optional, owner only)
-
-Flash a Govee light when `LIGHTS_CHANNEL` gets a follow (purple), sub/resub/gift bomb (green) or raid (red/blue), then put the light back how it was.
-
-1. Govee Home app → Profile → About Us → **Apply for API Key** (arrives by email).
-2. Railway Variables: `GOVEE_API_KEY`, `LIGHTS_CHANNEL=imbon3s`, optionally `GOVEE_DEVICE_NAME` (default `Govee Glide wall light`, must match the name in the Govee app).
-3. Open `/lights/connect?key=ADMIN_KEY` and log in as the streamer account (grants follower + subscriber read).
-4. Test: `/admin/lights?key=ADMIN_KEY&test=follow` (or `sub`, `raid`). `/admin/lights?key=ADMIN_KEY` lists the Govee devices the key can see.
-
-Govee's cloud API is rate limited, so flashes are a few slow pulses and floods are trimmed to two queued alerts per type.

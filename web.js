@@ -109,27 +109,6 @@ function createApp(pool) {
     res.redirect(twitch.authorizeUrl({ scopes: action === "add" ? twitch.STREAMER_SCOPES : [], state }));
   });
 
-  // Owner: let the bot see follows/subs/raids on LIGHTS_CHANNEL so lights.js can flash the Govee light
-  const lights = require("./lights");
-  app.get("/lights/connect", (req, res) => {
-    if (req.query.key !== cfg.ADMIN_KEY) return res.status(403).send(simple("Forbidden", "Forbidden", "Add ?key=YOUR_ADMIN_KEY to the URL."));
-    if (!lights.enabled()) return res.status(503).send(simple("Lights off", "Lights aren't configured", "Set GOVEE_API_KEY and LIGHTS_CHANNEL in Railway first."));
-    const state = sign({ purpose: "lights", nonce: crypto.randomBytes(8).toString("hex"), ts: Date.now() });
-    res.setHeader("Set-Cookie", `oh_state=${state}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=600${cfg.BASE_URL.startsWith("https") ? "; Secure" : ""}`);
-    res.send(simple("Stream lights", "Connect follow/sub/raid alerts",
-      `Log in as <b>${esc(lights.channel())}</b> (your streamer account, not the bot) so the bot can see new follows, subs and raids.`,
-      `<p><a class="btn" href="${esc(twitch.authorizeUrl({ scopes: [...twitch.STREAMER_SCOPES, ...lights.SCOPES], state, forceVerify: true }))}">Connect with Twitch</a></p>`));
-  });
-  app.get("/admin/lights", async (req, res) => {
-    if (req.query.key !== cfg.ADMIN_KEY) return res.status(403).send("forbidden");
-    try {
-      const ev = String(req.query.test || "");
-      if (ev) { lights.enqueue(ev, "test"); return res.json({ ok: true, queued: ev }); }
-      const devices = await lights.listDevices();
-      res.json({ channel: lights.channel(), broadcasterId: lights.broadcasterId(), devices: devices.map((d) => ({ name: d.deviceName, sku: d.sku, colorRgb: d.capabilities?.some((c) => c.instance === "colorRgb") })) });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-  });
-
   // Owner: one-time login AS THE BOT ACCOUNT to store its tokens
   app.get("/setup", (req, res) => {
     if (req.query.key !== cfg.ADMIN_KEY) return res.status(403).send(simple("Forbidden", "Forbidden", "Add ?key=YOUR_ADMIN_KEY to the URL."));
@@ -155,14 +134,6 @@ function createApp(pool) {
         await pool.join(user.id).catch((e) => console.error("[setup] join own channel failed:", e.message));
         if (!wasSetUp) await pool.joinAllFromDb();
         return res.send(simple("Setup complete", `Bot is running as ${user.display_name}`, `Streamers can now add it from <a href="/">the home page</a> or by typing <code>!join</code> in <a href="https://twitch.tv/${esc(user.login)}">twitch.tv/${esc(user.login)}</a>.`));
-      }
-
-      if (state.purpose === "lights") {
-        if (user.login !== lights.channel()) return res.status(400).send(simple("Wrong account", "Wrong account", `You logged in as ${esc(user.login)}; log in as ${esc(lights.channel())}.`));
-        await lights.init(pool);
-        const missing = await lights.subscribe(pool, user.id);
-        return res.send(simple("Lights connected", missing.length ? "Partly connected" : "Lights connected!",
-          missing.length ? `Twitch refused: ${esc(missing.join(", "))}. Try again.` : `Follows flash purple, subs green, raids red/blue. Test: <code>/admin/lights?key=…&amp;test=follow</code>`));
       }
 
       if (state.action === "remove") {
