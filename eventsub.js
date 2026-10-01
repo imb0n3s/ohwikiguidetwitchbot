@@ -11,8 +11,9 @@ const db = require("./db");
 const WS_URL = "wss://eventsub.wss.twitch.tv/ws?keepalive_timeout_seconds=30";
 
 class Conduit {
-  constructor(onChat) {
+  constructor(onChat, onEvent) {
     this.onChat = onChat;
+    this.onEvent = onEvent; // non-chat notifications (follows, subs, raids)
     this.conduitId = null;
     this.subs = new Map(); // broadcaster_id -> subscription id
     this.ws = null;
@@ -97,14 +98,17 @@ class Conduit {
     if (type === "session_keepalive") return this.armKeepalive(30);
     if (type === "session_reconnect") return this.connect(msg.payload.session.reconnect_url, true);
     if (type === "revocation") {
-      const bid = msg.payload.subscription.condition.broadcaster_user_id;
-      console.warn(`[eventsub] subscription revoked for ${bid}: ${msg.payload.subscription.status}`);
-      this.subs.delete(bid);
+      const sub = msg.payload.subscription;
+      const bid = sub.condition.broadcaster_user_id || sub.condition.to_broadcaster_user_id;
+      console.warn(`[eventsub] ${sub.type} revoked for ${bid}: ${sub.status}`);
+      if (sub.type === "channel.chat.message") this.subs.delete(bid);
       return;
     }
     if (type === "notification") {
       this.armKeepalive(30);
-      if (msg.metadata.subscription_type === "channel.chat.message") this.onChat(msg.payload.event);
+      const st = msg.metadata.subscription_type;
+      if (st === "channel.chat.message") this.onChat(msg.payload.event);
+      else { try { this.onEvent?.(st, msg.payload.event); } catch (e) { console.error(`[eventsub] ${st} handler:`, e.message); } }
     }
   }
 
