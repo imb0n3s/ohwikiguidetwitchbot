@@ -82,21 +82,22 @@ async function flash(kind) {
   let before = null;
   try { before = await getState(); } catch (e) { console.warn("[lights] couldn't read state, won't restore:", e.message); }
   try {
-    if (before && !before.powerSwitch) await setPower(true);
+    if (before && !before.powerSwitch) { await setPower(true); await sleep(STEP_MS); }
     for (const st of steps) {
       if (st.color != null) await setColor(st.color);
+      if (st.color != null && st.bright != null) await sleep(STEP_MS);
       if (st.bright != null) await setBright(st.bright);
       await sleep(STEP_MS);
     }
   } finally {
     if (before) {
       try {
+        // The light drops commands sent back to back, so space the restore out too.
+        if (before.colorTemperatureK) await setTemp(before.colorTemperatureK);
+        else if (before.colorRgb != null) await setColor(before.colorRgb);
+        await sleep(STEP_MS);
+        if (before.brightness) { await setBright(before.brightness); await sleep(STEP_MS); }
         if (!before.powerSwitch) await setPower(false);
-        else {
-          if (before.colorTemperatureK) await setTemp(before.colorTemperatureK);
-          else if (before.colorRgb != null) await setColor(before.colorRgb);
-          if (before.brightness) await setBright(before.brightness);
-        }
       } catch (e) { console.warn("[lights] restore failed:", e.message); }
     }
   }
