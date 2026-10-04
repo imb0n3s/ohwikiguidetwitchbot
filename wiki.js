@@ -159,16 +159,40 @@ function pageUrl(title) {
   return `${WIKI_BASE}/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 }
 
-// Individual deviation pages all open with "Type: Combat/Territory/Crafting Deviation".
-// Chat answers for those link to the Deviation Main Page, not the single deviation's page.
+// ---- which pages the bot may link ----
+// Only pages reachable from the front page (links on Main Page + the sidebar nav) get linked.
+// A single deviation's page isn't, so deviation answers link to the Deviation Main Page;
+// anything else unreachable links to the front page itself.
 const DEVIATION_MAIN_PAGE = "Deviation Main Page";
+const LINKABLE_FALLBACK = ["Main Page", "Community Builds", "Creative Cooking Recipe", "Deviation Main Page", "Deviation Trait Page", "Gardener Glass",
+  "Lightforge Loot Crate", "Load Out Page", "Outpost", "Patch Notes", "Securement Silo", "Settlements", "Technological Bench", "Thank You",
+  "Deviation Hunt", "Promo Codes", "Assets", "Facility Locations", "Weapon and Armor", "Content Creators Loadouts"];
+let linkableCache = { set: null, ts: 0 };
+async function getLinkable() {
+  if (linkableCache.set && Date.now() - linkableCache.ts < TITLES_TTL_MS) return linkableCache.set;
+  const set = new Set(["Main Page"]);
+  try {
+    const data = await apiGet({ action: "query", prop: "links", titles: "Main Page", pllimit: "500", plnamespace: "0" });
+    for (const l of data.query?.pages?.[0]?.links || []) set.add(l.title);
+    const sidebar = await (await fetch(`${WIKI_BASE}/index.php?title=MediaWiki:Sidebar&action=raw`, { headers: { "User-Agent": UA } })).text();
+    for (const m of sidebar.matchAll(/^\*\*\s*([^|\n]+?)\s*\|/gm)) {
+      const target = m[1].trim();
+      if (!/^https?:/i.test(target) && target !== "mainpage") set.add(target.replace(/_/g, " "));
+    }
+  } catch (e) { console.error("[wiki] linkable pages fetch failed:", e.message); }
+  if (set.size < 5) for (const t of LINKABLE_FALLBACK) set.add(t);
+  linkableCache = { set, ts: Date.now() };
+  return set;
+}
 function isDeviationPage(text) {
   return /^(?:Summary:[^\n]*\n)?\s*Type:[^\n]*\bDeviations?\b/i.test(String(text || ""));
 }
 async function answerUrl(title) {
-  if (title === DEVIATION_MAIN_PAGE) return pageUrl(title);
+  const linkable = await getLinkable();
+  if (linkable.has(title)) return pageUrl(title);
+  if (/deviation/i.test(title)) return pageUrl(DEVIATION_MAIN_PAGE);
   try { if (isDeviationPage(await getPageText(title))) return pageUrl(DEVIATION_MAIN_PAGE); } catch {}
-  return pageUrl(title);
+  return WIKI_BASE;
 }
 
 // Chat nicknames -> what the wiki calls it. Matched as whole phrases, longest first.
@@ -292,4 +316,4 @@ async function findRelevantPages(question, max = 3) {
   return picks.slice(0, max);
 }
 
-module.exports = { correctSpelling, htmlToText, findRelevantPages, getPageText, trimForQuestion, getSectionIndex, nameWords, includesName, expandNicknames, pageUrl, answerUrl, isDeviationPage, getAllTitles, searchTitles, WIKI_BASE };
+module.exports = { correctSpelling, htmlToText, findRelevantPages, getPageText, trimForQuestion, getSectionIndex, nameWords, includesName, expandNicknames, pageUrl, answerUrl, isDeviationPage, getLinkable, getAllTitles, searchTitles, WIKI_BASE };
