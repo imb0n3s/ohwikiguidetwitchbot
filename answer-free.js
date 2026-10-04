@@ -137,7 +137,7 @@ async function answerQuestion(question) {
 
   // Variation asked by name ("lunar lonewolf", "glistening blue butterfly") -> answer with just that variation
   const variation = findVariation(body, qWords, label);
-  if (variation) return { text: `${label} — ${variation.name} variation: ${variation.desc}`, source: title, url: wiki.pageUrl(title) };
+  if (variation) return { text: `${label} — ${variation.name} variation: ${variation.desc}`, source: title, url: await wiki.answerUrl(title) };
 
   let out = `${label} — ${summarize(label, body, question)}`.replace(/\s+/g, " ").trim();
   // Scenario filter: "in Manibus" -> only the Manibus line of scenario-split fields (Drops From etc.)
@@ -160,7 +160,7 @@ async function answerQuestion(question) {
     if (scen.label === "Endless Dream") out += " (Endless Dream combines the Manibus and Way of Winter maps, so both apply)";
   }
   if (out.length > MAX_ANSWER_CHARS) out = out.slice(0, MAX_ANSWER_CHARS - 1).replace(/\s+\S*$/, "") + "…";
-  return { text: out, source: title, url: wiki.pageUrl(title) };
+  return { text: out, source: title, url: await wiki.answerUrl(title) };
 }
 
 module.exports = { answerQuestion };
