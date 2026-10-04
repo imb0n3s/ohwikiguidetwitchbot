@@ -159,6 +159,18 @@ function pageUrl(title) {
   return `${WIKI_BASE}/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 }
 
+// Individual deviation pages all open with "Type: Combat/Territory/Crafting Deviation".
+// Chat answers for those link to the Deviation Main Page, not the single deviation's page.
+const DEVIATION_MAIN_PAGE = "Deviation Main Page";
+function isDeviationPage(text) {
+  return /^(?:Summary:[^\n]*\n)?\s*Type:[^\n]*\bDeviations?\b/i.test(String(text || ""));
+}
+async function answerUrl(title) {
+  if (title === DEVIATION_MAIN_PAGE) return pageUrl(title);
+  try { if (isDeviationPage(await getPageText(title))) return pageUrl(DEVIATION_MAIN_PAGE); } catch {}
+  return pageUrl(title);
+}
+
 // Chat nicknames -> what the wiki calls it. Matched as whole phrases, longest first.
 // Add to this list whenever viewers use a name the wiki doesn't.
 const NICKNAMES = {
@@ -280,4 +292,4 @@ async function findRelevantPages(question, max = 3) {
   return picks.slice(0, max);
 }
 
-module.exports = { correctSpelling, htmlToText, findRelevantPages, getPageText, trimForQuestion, getSectionIndex, nameWords, includesName, expandNicknames, pageUrl, getAllTitles, searchTitles, WIKI_BASE };
+module.exports = { correctSpelling, htmlToText, findRelevantPages, getPageText, trimForQuestion, getSectionIndex, nameWords, includesName, expandNicknames, pageUrl, answerUrl, isDeviationPage, getAllTitles, searchTitles, WIKI_BASE };
