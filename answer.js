@@ -52,7 +52,7 @@ async function answerQuestion(question) {
   out = out.replace(/\s+/g, " ");
   if (out.length > MAX_ANSWER_CHARS) out = out.slice(0, MAX_ANSWER_CHARS - 1).replace(/\s+\S*$/, "") + "…";
 
-  return { text: out, source, url: wiki.pageUrl(source) };
+  return { text: out, source, url: await wiki.answerUrl(source) };
 }
 
 module.exports = { answerQuestion };
