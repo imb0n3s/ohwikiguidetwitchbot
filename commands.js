@@ -5,10 +5,10 @@ const twitch = require("./twitch");
 const { answerQuestion } = require("./answerer");
 
 // Inside jokes: when a specific viewer asks something matching the pattern, reply with a canned line.
-// login is the Twitch username (lowercase). Add more entries as needed.
+// logins: list of Twitch usernames (lowercase), or leave it out to apply to everyone.
 const EASTER_EGGS = [
-  { login: "n1ghtwalk3r1119", re: /\b(outfit|outfits|clothes|clothing|dress|pants|skirt|jeans|leggings|wear|wearing|butt|booty|bum|ass|rear|behind|cheeks|accentuate|accentuates|flatter|flatters)\b/i,
-    reply: "For all your needs visit https://www.whatclinic.com/cosmetic-plastic-surgery/philippines/manila/buttock-lift and let us know how it does" },
+  { re: /\b(outfit|outfits|clothes|clothing|dress|pants|skirt|jeans|leggings|butt|booty|bum|ass|cheeks|accentuate|accentuates|flatter|flatters)\b/i,
+    reply: "For all your needs visit https://www.whatclinic.com/cosmetic-plastic-surgery/philippines/manila/buttock-lift and let us know how it goes" },
 ];
 
 const lastAsk = new Map(); // `${broadcaster}:${user}` -> ts
@@ -82,7 +82,7 @@ function makeHandler(pool) {
 
     if (!arg) return reply(`Usage: ${cmd} <your question> — e.g. ${cmd} where does Butterfly's Emissary drop?`);
 
-    const egg = EASTER_EGGS.find((e) => e.login === (ev.chatter_user_login || "").toLowerCase() && e.re.test(arg));
+    const egg = EASTER_EGGS.find((e) => (!e.logins || e.logins.includes((ev.chatter_user_login || "").toLowerCase())) && e.re.test(arg));
     if (egg) return reply(egg.reply);
 
     const now = Date.now();
