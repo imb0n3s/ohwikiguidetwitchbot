@@ -155,7 +155,11 @@ async function answerBuild(question) {
   const matches = findBuilds(question, rows);
   if (!matches.length) return null;
   const best = matches[0];
-  const others = matches.slice(1).filter((m) => m.decoded.primary?.type === best.decoded.primary?.type);
+  // If the question named the build's author ("bones bow build"), they wanted that one build — skip the "N more builds" tail.
+  const q = question.toLowerCase().replace(/[^\w.%' -]+/g, " ").split(/\s+/);
+  const bestAuthor = (best.author || "").toLowerCase();
+  const askedByName = q.some((w) => (AUTHORS[w] || w) === bestAuthor || (w.length > 3 && bestAuthor.includes(w)));
+  const others = askedByName ? [] : matches.slice(1).filter((m) => m.decoded.primary?.type === best.decoded.primary?.type);
   return { messages: format(best, others), source: `Community Builds #${best.id}`, url: null };
 }
 
